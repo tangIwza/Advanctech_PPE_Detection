@@ -1,0 +1,119 @@
+{
+  "tested_at": "2026-11-12T22:14:04.7185383+07:00",
+  "model_name": "best.pt",
+  "model_sha256": "b1a4c6457086c77f90c8dab5ebf65086f507b380357844bb72486e076f57c984",
+  "classes": [
+    {
+      "id": 0,
+      "name": "person",
+      "kind": "person",
+      "color": "#3b82f6"
+    },
+    {
+      "id": 1,
+      "name": "ear-mufs",
+      "kind": "ppe",
+      "color": "#8b5cf6"
+    },
+    {
+      "id": 2,
+      "name": "face-mask",
+      "kind": "ppe",
+      "color": "#06b6d4"
+    },
+    {
+      "id": 3,
+      "name": "foot",
+      "kind": "body_part",
+      "color": "#64748b"
+    },
+    {
+      "id": 4,
+      "name": "glasses",
+      "kind": "ppe",
+      "color": "#d946ef"
+    },
+    {
+      "id": 5,
+      "name": "gloves",
+      "kind": "ppe",
+      "color": "#14b8a6"
+    },
+    {
+      "id": 6,
+      "name": "helmet",
+      "kind": "ppe",
+      "color": "#22c55e"
+    },
+    {
+      "id": 7,
+      "name": "shoes",
+      "kind": "ppe",
+      "color": "#f97316"
+    },
+    {
+      "id": 8,
+      "name": "safety-suit",
+      "kind": "ppe",
+      "color": "#6366f1"
+    },
+    {
+      "id": 9,
+      "name": "safety-vest",
+      "kind": "ppe",
+      "color": "#eab308"
+    }
+  ],
+  "source": {
+    "id": "sample-video",
+    "name": "Safety Helmet Videos.mp4",
+    "kind": "video",
+    "loop": true
+  },
+  "frames_processed": 1832,
+  "frame_size": [
+    1280,
+    720
+  ],
+  "inference_ms": 137.7,
+  "current_violations": [
+    {
+      "zone_id": "975066894ddd4dd1b2e8d6c244ddced1",
+      "zone_name": "Sample PPE check",
+      "source_id": "sample-video",
+      "track_id": 2,
+      "kind": "missing_ppe",
+      "missing_class_ids": [
+        9
+      ],
+      "person_bbox": [
+        0.5973074913024903,
+        0.2545917299058702,
+        0.6923611640930176,
+        0.9556204901801215
+      ]
+    },
+    {
+      "zone_id": "05456de31c13447398bd2411332a4def",
+      "zone_name": "Sample no-entry area",
+      "source_id": "sample-video",
+      "track_id": 2,
+      "kind": "intrusion",
+      "missing_class_ids": [],
+      "person_bbox": [
+        0.5973074913024903,
+        0.2545917299058702,
+        0.6923611640930176,
+        0.9556204901801215
+      ]
+    }
+  ],
+  "sample_test_events": {
+    "missing_ppe": 232,
+    "intrusion": 19
+  },
+  "backend_tests": 22,
+  "frontend_tests": 11,
+  "hardware_webcam_tested": false,
+  "hardware_rtsp_tested": false
+}

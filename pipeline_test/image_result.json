@@ -1,0 +1,138 @@
+{
+  "filename": "pipeline_test.jpg",
+  "snapshot_url": "/captures/labeled_pipeline_test_20261112_210830_158.jpg",
+  "label_url": "/labels_out/labeled_pipeline_test_20261112_210830_158.txt",
+  "prediction": {
+    "total_boxes": 9,
+    "counts": {
+      "person": 2,
+      "ear-mufs": 0,
+      "face-mask": 0,
+      "foot": 0,
+      "glasses": 0,
+      "gloves": 0,
+      "helmet": 2,
+      "shoes": 4,
+      "safety-suit": 0,
+      "safety-vest": 1
+    },
+    "classes": {
+      "0": "person",
+      "1": "ear-mufs",
+      "2": "face-mask",
+      "3": "foot",
+      "4": "glasses",
+      "5": "gloves",
+      "6": "helmet",
+      "7": "shoes",
+      "8": "safety-suit",
+      "9": "safety-vest"
+    },
+    "model_sha256": "b1a4c6457086c77f90c8dab5ebf65086f507b380357844bb72486e076f57c984",
+    "compliance_status": "COMPLIANT",
+    "is_compliant": true,
+    "compliance_scope": "helmet_count_only",
+    "detections": [
+      {
+        "class_id": 6,
+        "class_name": "helmet",
+        "confidence": 0.9,
+        "bbox": [
+          804,
+          189,
+          865,
+          245
+        ]
+      },
+      {
+        "class_id": 0,
+        "class_name": "person",
+        "confidence": 0.86,
+        "bbox": [
+          590,
+          182,
+          788,
+          691
+        ]
+      },
+      {
+        "class_id": 6,
+        "class_name": "helmet",
+        "confidence": 0.82,
+        "bbox": [
+          614,
+          183,
+          692,
+          248
+        ]
+      },
+      {
+        "class_id": 0,
+        "class_name": "person",
+        "confidence": 0.81,
+        "bbox": [
+          765,
+          183,
+          886,
+          688
+        ]
+      },
+      {
+        "class_id": 7,
+        "class_name": "shoes",
+        "confidence": 0.72,
+        "bbox": [
+          587,
+          654,
+          660,
+          691
+        ]
+      },
+      {
+        "class_id": 7,
+        "class_name": "shoes",
+        "confidence": 0.65,
+        "bbox": [
+          633,
+          646,
+          715,
+          684
+        ]
+      },
+      {
+        "class_id": 7,
+        "class_name": "shoes",
+        "confidence": 0.6,
+        "bbox": [
+          783,
+          647,
+          872,
+          689
+        ]
+      },
+      {
+        "class_id": 9,
+        "class_name": "safety-vest",
+        "confidence": 0.54,
+        "bbox": [
+          603,
+          260,
+          744,
+          449
+        ]
+      },
+      {
+        "class_id": 7,
+        "class_name": "shoes",
+        "confidence": 0.3,
+        "bbox": [
+          587,
+          648,
+          704,
+          690
+        ]
+      }
+    ],
+    "yolo_labels_txt": "6 0.651953 0.301389 0.047656 0.077778\n0 0.538281 0.606250 0.154688 0.706944\n6 0.510156 0.299306 0.060937 0.090278\n0 0.644922 0.604861 0.094531 0.701389\n7 0.487109 0.934028 0.057031 0.051389\n7 0.526563 0.923611 0.064062 0.052778\n7 0.646484 0.927778 0.069531 0.058333\n9 0.526172 0.492361 0.110156 0.262500\n7 0.504297 0.929167 0.091406 0.058333"
+  }
+}

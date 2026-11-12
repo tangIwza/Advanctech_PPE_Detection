@@ -1,0 +1,22 @@
+export type Rect = { x1: number; y1: number; x2: number; y2: number };
+export type ClassInfo = { id: number; name: string; kind: 'person' | 'ppe' | 'body_part' | 'other'; color: string };
+export type ModelInfo = { model_name: string; sha256: string; device: string; class_count: number; classes: ClassInfo[]; person_class_ids: number[]; ppe_class_ids: number[]; training: null | { recorded_training_epochs: number; target_epochs: number; best_validation: Record<string, string> } };
+export type ZoneInput = { source_id: string; name: string; kind: 'ppe' | 'restricted'; rect: Rect; required_class_ids: number[]; anchor: 'feet' | 'centroid'; enabled: boolean };
+export type Zone = ZoneInput & { id: string; version: number; updated_at: string };
+export type VideoSource = { id: string; name: string; size: number; sample: boolean };
+export type SourceRef = { id: string; name: string; kind: 'video' | 'camera'; loop: boolean };
+export type Detection = { class_id: number; class_name: string; confidence: number; bbox: [number, number, number, number]; track_id: number | null };
+export type Violation = { zone_id: string; zone_name: string; source_id: string; track_id: number; kind: 'intrusion' | 'missing_ppe'; missing_class_ids: number[]; person_bbox: number[] };
+export type Alert = Violation & { id: string; created_at: string; source_name: string; missing_classes: string[]; acknowledged_at: string | null; resolved_at: string | null; resolution_reason?: string; snapshot_url: string | null };
+export type ZoneResult = { zone_id: string; occupancy: number; violation_count: number; violating_track_ids: number[] };
+export type Packet = {
+  type: 'frame'; sequence: number; frame_id: number; timestamp: string; has_frame: boolean;
+  width: number; height: number; state: 'idle' | 'opening' | 'running' | 'paused' | 'stopped' | 'ended' | 'error'; error: string | null;
+  source: SourceRef | null; fps: number; inference_ms: number; frames_processed: number;
+  position_seconds: number; duration_seconds: number; counts: Record<string, number>; detections: Detection[];
+  zones: Zone[]; zone_results: ZoneResult[]; violations: Violation[]; active_alert_count: number; alerts: Alert[];
+};
+export type DisplayFrame = { url: string; packet: Packet };
+export type MonitorSettings = { confidence: number; association_threshold: number; resolve_after_seconds: number; max_upload_mb: number; max_zones: number; retention_days: number; authentication_enabled: boolean };
+export type Page = 'monitor' | 'zones' | 'alerts' | 'model' | 'settings';
+export type Toast = { id: number; message: string; kind: 'success' | 'error' | 'alert' };

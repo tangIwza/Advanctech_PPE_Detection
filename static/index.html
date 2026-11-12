@@ -1,0 +1,1262 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YOLOv8 PPE Detection & Auto-Labeling Workbench</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {}
+      }
+    };
+  </script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap');
+    body {
+      font-family: 'Inter', 'Noto Sans Thai', sans-serif;
+    }
+    .modern-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .modern-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .modern-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(148, 163, 184, 0.4); border-radius: 10px; }
+    .modern-scrollbar::-webkit-scrollbar-thumb:hover { background-color: rgba(148, 163, 184, 0.6); }
+
+    /* Dark Mode Overrides */
+    .dark .bg-white { background-color: #0f1923 !important; }
+    .dark .bg-slate-50, .dark .bg-gray-50 { background-color: #111c2a !important; }
+    .dark .bg-slate-100, .dark .bg-gray-100 { background-color: #1e293b !important; }
+    .dark .bg-slate-200 { background-color: #0b1520 !important; }
+    .dark .text-gray-900, .dark .text-gray-800, .dark .text-slate-800, .dark .text-slate-700 { color: #f8fafc !important; }
+    .dark .text-gray-600, .dark .text-slate-600 { color: #cbd5e1 !important; }
+    .dark .text-gray-500, .dark .text-slate-500, .dark .text-gray-400 { color: #94a3b8 !important; }
+    .dark .border-gray-100, .dark .border-gray-200, .dark .border-slate-200 { border-color: #1e293b !important; }
+    .dark input, .dark select, .dark textarea {
+      background-color: #0b1520 !important;
+      border-color: #334155 !important;
+      color: #f8fafc !important;
+    }
+  </style>
+</head>
+<body class="bg-slate-200 antialiased selection:bg-blue-900 selection:text-white">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    function Icon({ name, size = 16, className = "" }) {
+      const ref = useRef(null);
+      useEffect(() => {
+        if (ref.current && window.lucide) {
+          ref.current.innerHTML = `<i data-lucide="${name}"></i>`;
+          window.lucide.createIcons({
+            root: ref.current,
+            attrs: { width: size, height: size, class: className }
+          });
+        }
+      }, [name, size, className]);
+      return <span ref={ref} className="inline-flex items-center justify-center shrink-0" />;
+    }
+
+    const CLASS_COLOR = {
+      person: '#2d82eb', 'ear-mufs': '#dc64b4', 'face-mask': '#28bedc', foot: '#6482a0',
+      glasses: '#a050d2', gloves: '#b4b450', helmet: '#41cd28', shoes: '#f06496',
+      'safety-suit': '#3caabe', 'safety-vest': '#faa514'
+    };
+    const classColor = name => CLASS_COLOR[name] || '#64748b';
+
+    function CountSummary({ counts = {} }) {
+      const entries = Object.entries(counts).filter(([, count]) => count > 0);
+      return <span>{entries.length ? entries.map(([name, count]) => `${name}: ${count}`).join(' · ') : 'No objects'}</span>;
+    }
+
+    function ClassLegend({ classes = {} }) {
+      return <div className="flex flex-wrap gap-2 text-[10px]">
+        {Object.entries(classes).map(([id, name]) => (
+          <span key={id} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-gray-200 text-gray-600">
+            <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: classColor(name) }} />{id}: {name}
+          </span>
+        ))}
+      </div>;
+    }
+
+    function ClassCounts({ classes = {}, counts = {} }) {
+      return <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-center">
+        {Object.entries(classes).map(([id, name]) => (
+          <div key={id} className="p-2.5 rounded-lg bg-slate-50 border border-gray-200" style={{ borderTopColor: classColor(name), borderTopWidth: 3 }}>
+            <p className="text-[10px] font-bold text-gray-600">{id}: {name}</p>
+            <p className="text-xl font-black text-gray-800 mt-0.5">{counts[name] || 0}</p>
+          </div>
+        ))}
+      </div>;
+    }
+
+    function StatusBadge({ status }) {
+      const styles = {
+        'COMPLIANT': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        'PPE_COMPLIANT': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        'PPE_DETECTED': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        'MISSING_PPE': 'bg-red-50 text-red-700 border-red-200',
+        'NO_PERSON': 'bg-slate-100 text-slate-600 border-slate-200',
+        'READY': 'bg-blue-50 text-blue-700 border-blue-200',
+        'SYSTEM': 'bg-slate-100 text-slate-600 border-slate-200',
+        'NOT_AVAILABLE': 'bg-slate-100 text-slate-600 border-slate-200',
+        'DETECTION': 'bg-blue-50 text-blue-700 border-blue-200',
+      };
+      const cls = styles[status] || styles['SYSTEM'];
+      const isAlert = status === 'MISSING_PPE';
+      const isOk = status === 'COMPLIANT' || status === 'PPE_COMPLIANT' || status === 'PPE_DETECTED';
+      const labelMap = {
+        'COMPLIANT': 'HELMET COUNT OK',
+        'PPE_COMPLIANT': 'HELMET COUNT OK',
+        'PPE_DETECTED': 'OBJECTS DETECTED',
+        'MISSING_PPE': 'HELMET COUNT LOW',
+        'NO_PERSON': 'NO PERSON',
+        'NOT_AVAILABLE': 'NO HELMET CLASS',
+        'DETECTION': 'OBJECTS DETECTED',
+      };
+      return (
+        <span className={`px-2.5 py-0.5 text-[11px] font-semibold rounded-full border ${cls} inline-flex items-center gap-1`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${isAlert ? 'bg-red-600 animate-ping' : isOk ? 'bg-emerald-500' : 'bg-current'}`} />
+          {labelMap[status] || status}
+        </span>
+      );
+    }
+
+    function App() {
+      const [isDark, setIsDark] = useState(false);
+      const [collapsed, setCollapsed] = useState(false);
+      const [activePage, setActivePage] = useState('live-test');
+      const [expandedGroups, setExpandedGroups] = useState({
+        'PPE Model Testing': true,
+        'Model & Notebook Info': true,
+      });
+
+      const [status, setStatus] = useState({
+        is_running: false,
+        source: "0",
+        fps: 0,
+        threshold: 0.25,
+        model_name: "",
+        is_custom_ppe_model: false,
+        task: "detect",
+        classes: {},
+        current_prediction: {
+          total_boxes: 0,
+          counts: {},
+          compliance_status: "READY",
+          is_compliant: null,
+          detections: [],
+          yolo_labels_txt: ""
+        },
+        total_frames_tested: 0,
+        total_persons_detected: 0,
+        total_helmets_detected: 0,
+        total_vests_detected: 0,
+        sample_video_available: true,
+        last_labeled_video_url: ""
+      });
+
+      const [logs, setLogs] = useState([]);
+      const [cameraMode, setCameraMode] = useState('image-test'); // 'image-test', 'video-upload', 'browser', 'backend'
+      const [rtspSource, setRtspSource] = useState('0');
+      const [browserStreamActive, setBrowserStreamActive] = useState(false);
+      const [browserAnnotatedFrame, setBrowserAnnotatedFrame] = useState('');
+      const [browserFps, setBrowserFps] = useState(0);
+      const [cameraError, setCameraError] = useState('');
+      const [toast, setToast] = useState(null);
+      const [modalImage, setModalImage] = useState(null);
+
+      // Single / Batch Image Testing Results
+      const [testResults, setTestResults] = useState([]);
+      const [selectedTestResult, setSelectedTestResult] = useState(null);
+      const [isUploading, setIsUploading] = useState(false);
+      const [isExportingVideo, setIsExportingVideo] = useState(false);
+
+      const videoRef = useRef(null);
+      const canvasRef = useRef(null);
+      const browserLoopRef = useRef(false);
+
+      const showToast = (msg, type = 'success') => {
+        setToast({ msg, type });
+        setTimeout(() => setToast(null), 4000);
+      };
+
+      const fetchAllData = async () => {
+        try {
+          const [stRes, lgRes] = await Promise.all([
+            fetch('/api/status'),
+            fetch('/api/logs')
+          ]);
+          if (stRes.ok) setStatus(await stRes.json());
+          if (lgRes.ok) {
+            const data = await lgRes.json();
+            setLogs(data.logs || []);
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      };
+
+      useEffect(() => {
+        fetchAllData();
+        const timer = setInterval(fetchAllData, 1200);
+        return () => clearInterval(timer);
+      }, []);
+
+      const handleThresholdChange = async (val) => {
+        const num = parseFloat(val);
+        setStatus(prev => ({ ...prev, threshold: num }));
+        await fetch('/api/threshold', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ threshold: num })
+        });
+      };
+
+      // ================= IMAGE BATCH / SINGLE TEST =================
+      const handleImageUploadTest = async (e) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
+
+        setIsUploading(true);
+        const newResults = [];
+
+        for (const file of files) {
+          const formData = new FormData();
+          formData.append('file', file);
+          try {
+            const res = await fetch('/api/test_image', { method: 'POST', body: formData });
+            if (res.ok) {
+              const data = await res.json();
+              newResults.unshift(data);
+            }
+          } catch (err) {
+            console.error(err);
+          }
+        }
+
+        if (newResults.length > 0) {
+          setTestResults(prev => [...newResults, ...prev]);
+          setSelectedTestResult(newResults[0]);
+          const first = newResults[0].prediction;
+          const c = first.counts || {};
+          showToast(
+            `วิเคราะห์ภาพสำเร็จ (${newResults.length} ภาพ) — ${Object.entries(c).filter(([, count]) => count > 0).map(([name, count]) => `${name}: ${count}`).join(', ') || 'ไม่พบวัตถุ'}`,
+            first.is_compliant === false ? 'error' : 'success'
+          );
+          fetchAllData();
+        }
+        setIsUploading(false);
+        e.target.value = '';
+      };
+
+      // ================= VIDEO FILE UPLOAD & SAMPLE VIDEO TEST =================
+      const handleVideoUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        stopBrowserWebcam();
+        setIsUploading(true);
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          const res = await fetch('/api/upload_video', { method: 'POST', body: formData });
+          const data = await res.json();
+          if (res.ok) {
+            showToast(`กำลังเล่นและตรวจจับ PPE บนวิดีโอ: ${file.name}`, 'success');
+            fetchAllData();
+          } else {
+            showToast(data.detail || 'ไม่สามารถเปิดไฟล์วิดีโอได้', 'error');
+          }
+        } catch (err) {
+          showToast('เกิดข้อผิดพลาดในการอัปโหลดวิดีโอ', 'error');
+        } finally {
+          setIsUploading(false);
+          e.target.value = '';
+        }
+      };
+
+      const handlePlaySampleVideo = async () => {
+        stopBrowserWebcam();
+        try {
+          const res = await fetch('/api/play_sample_video', { method: 'POST' });
+          const data = await res.json();
+          if (res.ok) {
+            showToast('กำลังสตรีมและตีกรอบ PPE บนวิดีโอตัวอย่าง (Safety Helmet Videos.mp4)', 'success');
+            fetchAllData();
+          } else {
+            showToast(data.detail || 'ไม่พบไฟล์วิดีโอตัวอย่าง', 'error');
+          }
+        } catch (err) {
+          showToast('ไม่สามารถเปิดวิดีโอตัวอย่างได้', 'error');
+        }
+      };
+
+      const handleExportLabeledVideo = async () => {
+        setIsExportingVideo(true);
+        showToast('กำลังประมวลผลและบันทึกไฟล์วิดีโอที่ตีกรอบ PPE แล้ว (.mp4)...', 'info');
+        try {
+          const res = await fetch('/api/export_labeled_video', { method: 'POST' });
+          const data = await res.json();
+          if (res.ok) {
+            showToast(`ส่งออกวิดีโอสำเร็จ: ${data.filename} (${data.frames_processed} เฟรม)`, 'success');
+            fetchAllData();
+            window.open(data.video_url, '_blank');
+          } else {
+            showToast(data.detail || 'ไม่สามารถส่งออกวิดีโอได้', 'error');
+          }
+        } catch (err) {
+          showToast('เกิดข้อผิดพลาดในการส่งออกวิดีโอ', 'error');
+        } finally {
+          setIsExportingVideo(false);
+        }
+      };
+
+      // ================= MODEL WEIGHTS UPLOAD =================
+      const handleModelUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+          const res = await fetch('/api/upload_model', { method: 'POST', body: formData });
+          const data = await res.json();
+          if (res.ok) {
+            showToast(`เปลี่ยนไฟล์โมเดลเป็น '${data.model_name}' สำเร็จ!`, 'success');
+            fetchAllData();
+          } else {
+            showToast(data.detail || 'ไม่สามารถโหลดไฟล์โมเดลได้', 'error');
+          }
+        } catch (err) {
+          showToast('เกิดข้อผิดพลาดในการอัปโหลดโมเดล', 'error');
+        }
+        e.target.value = '';
+      };
+
+      // ================= WEBCAM & RTSP CONTROLS =================
+      const startBrowserWebcam = async () => {
+        setCameraError('');
+        try {
+          if (status.is_running) {
+            await fetch('/api/camera/stop', { method: 'POST' });
+          }
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 960 }, height: { ideal: 540 } },
+            audio: false
+          });
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            await videoRef.current.play();
+          }
+          setBrowserStreamActive(true);
+          browserLoopRef.current = true;
+          processBrowserLoop();
+          showToast('เปิดกล้อง Webcam ตรวจจับ PPE สำเร็จ', 'success');
+        } catch (err) {
+          setCameraError(`ไม่สามารถเปิดกล้อง Webcam ได้ (${err.message})`);
+          showToast('ไม่สามารถเปิดกล้อง Webcam ได้', 'error');
+        }
+      };
+
+      const stopBrowserWebcam = () => {
+        browserLoopRef.current = false;
+        setBrowserStreamActive(false);
+        setBrowserAnnotatedFrame('');
+        setBrowserFps(0);
+        if (videoRef.current && videoRef.current.srcObject) {
+          videoRef.current.srcObject.getTracks().forEach(t => t.stop());
+          videoRef.current.srcObject = null;
+        }
+      };
+
+      const processBrowserLoop = async () => {
+        let lastTime = performance.now();
+        while (browserLoopRef.current) {
+          if (videoRef.current && canvasRef.current && videoRef.current.readyState >= 2) {
+            const vw = videoRef.current.videoWidth || 640;
+            const vh = videoRef.current.videoHeight || 480;
+            canvasRef.current.width = vw;
+            canvasRef.current.height = vh;
+            const ctx = canvasRef.current.getContext('2d');
+            ctx.drawImage(videoRef.current, 0, 0, vw, vh);
+            const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.8);
+
+            try {
+              const res = await fetch('/api/process_frame', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image_base64: dataUrl })
+              });
+              if (res.ok) {
+                const result = await res.json();
+                setBrowserAnnotatedFrame(result.annotated_base64);
+                setStatus(prev => ({ ...prev, current_prediction: result.prediction }));
+                const now = performance.now();
+                setBrowserFps(Math.round((1000 / Math.max(1, now - lastTime)) * 10) / 10);
+                lastTime = now;
+              }
+            } catch (e) {}
+          }
+          await new Promise(r => setTimeout(r, 45));
+        }
+      };
+
+      const startBackendCamera = async () => {
+        setCameraError('');
+        stopBrowserWebcam();
+        try {
+          const res = await fetch('/api/camera/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source: rtspSource })
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            setCameraError(data.detail || 'ไม่สามารถเปิดกล้องได้');
+            showToast(data.detail || 'เปิดกล้องไม่สำเร็จ', 'error');
+          } else {
+            showToast(`เชื่อมต่อสัญญาณ (${rtspSource}) สำเร็จ`, 'success');
+            fetchAllData();
+          }
+        } catch (err) {
+          setCameraError('เกิดข้อผิดพลาดในการเชื่อมต่อกล้อง');
+        }
+      };
+
+      const stopBackendCamera = async () => {
+        await fetch('/api/camera/stop', { method: 'POST' });
+        fetchAllData();
+        showToast('หยุดการสตรีมวิดีโอ/กล้องแล้ว', 'info');
+      };
+
+      const PAGE_INFO = {
+        'live-test': { title: 'YOLOv8 PPE Detection & Auto-Labeling Workbench', breadcrumb: ['PPE Model Testing', 'Image & Video Workbench'] },
+        'alert-logs': { title: 'Labeled Captures & Snapshots Gallery', breadcrumb: ['PPE Model Testing', 'Labeled Gallery'] },
+        'model-info': { title: 'Model Specs & Notebook Training Evaluation', breadcrumb: ['Model & Notebook Info', 'Specifications & Metrics'] },
+      };
+
+      const isAnyStreamActive = browserStreamActive || status.is_running;
+      const currentFps = browserStreamActive ? browserFps : status.fps;
+      const pred = selectedTestResult && cameraMode === 'image-test'
+        ? selectedTestResult.prediction
+        : status.current_prediction || { total_boxes: 0, counts: {}, compliance_status: 'READY', is_compliant: null, detections: [], yolo_labels_txt: "" };
+      const counts = pred.counts || {};
+      const displayedClasses = pred.classes || status.classes || {};
+      const classIdFor = name => Object.entries(displayedClasses).find(([, value]) => value === name)?.[0] ?? '—';
+      const activeClassCount = Object.keys(status.classes || {}).length;
+      const report = status.training_report;
+
+      return (
+        <div className={`flex h-screen bg-slate-200 overflow-hidden relative ${isDark ? 'dark' : ''}`}>
+          <video ref={videoRef} className="hidden" playsInline muted />
+          <canvas ref={canvasRef} className="hidden" />
+
+          {/* Toast */}
+          {toast && (
+            <div className={`fixed bottom-5 right-5 z-[100] px-4 py-3 rounded-xl shadow-lg border flex items-center gap-3 text-sm font-medium transition-all ${
+              toast.type === 'error' ? 'bg-red-600 text-white border-red-700' :
+              toast.type === 'info' ? 'bg-slate-800 text-white border-slate-700' :
+              'bg-blue-900 text-white border-blue-800'
+            }`}>
+              <Icon name={toast.type === 'error' ? 'shield-alert' : 'check-circle-2'} size={18} />
+              <span>{toast.msg}</span>
+            </div>
+          )}
+
+          {/* Snapshot Modal */}
+          {modalImage && (
+            <div className="fixed inset-0 bg-slate-900/70 z-[90] flex items-center justify-center p-4" onClick={() => setModalImage(null)}>
+              <div className="bg-white rounded-2xl max-w-4xl w-full overflow-hidden shadow-2xl border border-gray-200" onClick={e => e.stopPropagation()}>
+                <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Icon name="hard-hat" size={18} className="text-blue-900" />
+                    <h3 className="font-bold text-gray-800 text-sm">
+                      Labeled Frame — <CountSummary counts={modalImage.counts} />
+                    </h3>
+                  </div>
+                  <button onClick={() => setModalImage(null)} className="text-gray-400 hover:text-gray-700">
+                    <Icon name="x" size={18} />
+                  </button>
+                </div>
+                <div className="p-4 bg-slate-950 flex justify-center">
+                  <img src={modalImage.snapshot_url} alt="Capture" className="max-h-[72vh] object-contain rounded-lg" />
+                </div>
+                <div className="px-5 py-3 bg-gray-50 flex justify-between items-center text-xs text-gray-500">
+                  <span>Timestamp: {modalImage.timestamp}</span>
+                  <div className="flex items-center gap-2">
+                    {modalImage.label_url && (
+                      <a
+                        href={modalImage.label_url}
+                        download
+                        className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium inline-flex items-center gap-1.5"
+                      >
+                        <Icon name="file-text" size={13} /> ดาวน์โหลด YOLO Label (.txt)
+                      </a>
+                    )}
+                    <button onClick={() => setModalImage(null)} className="px-4 py-1.5 bg-blue-900 text-white rounded-lg font-medium">ปิดหน้าต่าง</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ==================== SIDEBAR ==================== */}
+          <aside
+            style={{ minWidth: collapsed ? '4rem' : '15.5rem' }}
+            className={`${collapsed ? 'w-16' : 'w-62'} bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-700/60 min-h-screen flex flex-col select-none shrink-0 transition-all duration-300 z-40`}
+          >
+            <button
+              onClick={() => setCollapsed(c => !c)}
+              className="flex items-center gap-2 mx-2 mt-2 px-3 py-2 rounded-lg text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors text-xs"
+            >
+              <Icon name={collapsed ? "panel-left-open" : "panel-left-close"} size={15} />
+              {!collapsed && <span>Collapse</span>}
+            </button>
+
+            <nav className="flex-1 py-2 px-2.5 space-y-1 overflow-y-auto modern-scrollbar">
+              <div>
+                {!collapsed && (
+                  <button
+                    onClick={() => setExpandedGroups(p => ({ ...p, 'PPE Model Testing': !p['PPE Model Testing'] }))}
+                    className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-700"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Icon name="cpu" size={15} />
+                      <span>PPE Model Testing</span>
+                    </div>
+                    <Icon name={expandedGroups['PPE Model Testing'] ? "chevron-down" : "chevron-right"} size={13} />
+                  </button>
+                )}
+
+                {(collapsed || expandedGroups['PPE Model Testing']) && (
+                  <div className={`${collapsed ? '' : 'ml-2 mt-0.5'} space-y-1`}>
+                    <button
+                      onClick={() => setActivePage('live-test')}
+                      className={`w-full flex items-center ${collapsed ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2'} rounded-lg text-sm transition-colors ${
+                        activePage === 'live-test'
+                          ? 'bg-blue-900 text-white font-medium shadow-sm'
+                          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                      }`}
+                    >
+                      <Icon name="monitor-play" size={16} />
+                      {!collapsed && <span>Image & Video Workbench</span>}
+                    </button>
+
+                    <button
+                      onClick={() => setActivePage('alert-logs')}
+                      className={`w-full flex items-center ${collapsed ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2'} rounded-lg text-sm transition-colors ${
+                        activePage === 'alert-logs'
+                          ? 'bg-blue-900 text-white font-medium shadow-sm'
+                          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                      }`}
+                    >
+                      <Icon name="images" size={16} />
+                      {!collapsed && (
+                        <div className="flex items-center justify-between flex-1">
+                          <span>Labeled Captures Gallery</span>
+                          {status.total_frames_tested > 0 && (
+                            <span className="px-1.5 py-0.2 text-[10px] rounded-full bg-blue-700 text-white font-bold">
+                              {logs.filter(l => l.snapshot_url).length}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-2">
+                {!collapsed && (
+                  <button
+                    onClick={() => setExpandedGroups(p => ({ ...p, 'Model & Notebook Info': !p['Model & Notebook Info'] }))}
+                    className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-700"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Icon name="file-code" size={15} />
+                      <span>Model & Notebook Info</span>
+                    </div>
+                    <Icon name={expandedGroups['Model & Notebook Info'] ? "chevron-down" : "chevron-right"} size={13} />
+                  </button>
+                )}
+
+                {(collapsed || expandedGroups['Model & Notebook Info']) && (
+                  <div className={`${collapsed ? '' : 'ml-2 mt-0.5'} space-y-1`}>
+                    <button
+                      onClick={() => setActivePage('model-info')}
+                      className={`w-full flex items-center ${collapsed ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2'} rounded-lg text-sm transition-colors ${
+                        activePage === 'model-info'
+                          ? 'bg-blue-900 text-white font-medium shadow-sm'
+                          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                      }`}
+                    >
+                      <Icon name="bar-chart-2" size={16} />
+                      {!collapsed && <span>Model Specs & Evaluation</span>}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </nav>
+
+            {!collapsed && (
+              <div className="p-3 m-3 rounded-xl bg-slate-50 border border-gray-200/80 text-xs space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-700 text-[11px] uppercase tracking-wider">Active Model</span>
+                  <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Ready
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-500 truncate">Weights: <strong className="text-gray-800">{status.model_name || 'Loading model…'}</strong></p>
+                <p className="text-[11px] text-gray-500">Task: <strong className="text-blue-900 uppercase">Object Detection ({activeClassCount} Classes)</strong></p>
+                <ClassLegend classes={status.classes} />
+              </div>
+            )}
+          </aside>
+
+          {/* ==================== MAIN CONTENT ==================== */}
+          <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+            <header className="bg-white border-b border-gray-200 px-6 py-3.5 flex items-center justify-between shrink-0 gap-3">
+              <div className="flex-1 min-w-0 flex items-baseline gap-2 truncate whitespace-nowrap">
+                {PAGE_INFO[activePage]?.breadcrumb.length > 1 && (
+                  <span className="text-sm text-gray-500">
+                    {PAGE_INFO[activePage].breadcrumb.slice(0, -1).join(' / ')} /
+                  </span>
+                )}
+                <h1 className="text-xl font-bold text-gray-800">{PAGE_INFO[activePage]?.title}</h1>
+              </div>
+
+              <div className="flex items-center gap-2.5 shrink-0">
+                <button
+                  onClick={() => fetch('/api/open_captures', { method: 'POST' })}
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 text-xs font-semibold text-gray-700 transition-colors"
+                >
+                  <Icon name="folder-open" size={14} />
+                  <span>เปิดโฟลเดอร์ภาพ/วิดีโอที่ตีกรอบแล้ว</span>
+                </button>
+
+                <button
+                  onClick={() => fetch('/api/open_labels', { method: 'POST' })}
+                  className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-xs font-semibold text-emerald-800 transition-colors"
+                >
+                  <Icon name="file-text" size={14} />
+                  <span>เปิดโฟลเดอร์ YOLO Labels (.txt)</span>
+                </button>
+              </div>
+            </header>
+
+            <main className="flex-1 overflow-y-auto p-6 space-y-6 modern-scrollbar">
+              {/* 1. KPI Summary Cards */}
+              <div>
+                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                  Real-Time PPE Object Detection & Labeling Telemetry
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col justify-between">
+                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider" title="เทียบจำนวนคนกับหมวกเท่านั้น">HELMET COUNT CHECK</span>
+                    <div className="mt-1.5 flex items-center justify-between">
+                      <StatusBadge status={pred.compliance_status || 'READY'} />
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col justify-between">
+                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">PERSONS IN FRAME</span>
+                    <div className="mt-1 flex items-baseline justify-between">
+                      <span className="text-2xl font-bold text-blue-700">{counts.person || 0}</span>
+                      <span className="text-[10px] text-blue-600 font-semibold">Class {classIdFor('person')}: person</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col justify-between">
+                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">HELMETS IN FRAME</span>
+                    <div className="mt-1 flex items-baseline justify-between">
+                      <span className="text-2xl font-bold text-emerald-600">{counts.helmet || 0}</span>
+                      <span className="text-[10px] text-emerald-700 font-semibold">Class {classIdFor('helmet')}: helmet</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col justify-between">
+                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">SAFETY-VESTS IN FRAME</span>
+                    <div className="mt-1 flex items-baseline justify-between">
+                      <span className="text-2xl font-bold text-amber-600">{counts['safety-vest'] || 0}</span>
+                      <span className="text-[10px] text-amber-700 font-semibold">Class {classIdFor('safety-vest')}: vest</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col justify-between">
+                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">FRAMES / IMAGES LABELED</span>
+                    <div className="mt-1 flex items-baseline justify-between">
+                      <span className="text-2xl font-bold text-gray-900">{status.total_frames_tested}</span>
+                      <span className="text-[11px] text-gray-400">Total</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col justify-between">
+                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">INFERENCE SPEED</span>
+                    <div className="mt-1 flex items-baseline gap-1.5">
+                      <span className="text-2xl font-bold text-blue-900">{isAnyStreamActive ? currentFps : 'Ready'}</span>
+                      {isAnyStreamActive && <span className="text-xs text-gray-500 font-medium">FPS</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ==================== PAGE 1: WORKBENCH ==================== */}
+              {activePage === 'live-test' && (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                  {/* Left 8 Cols: Viewport & Input Mode Switcher */}
+                  <div className="lg:col-span-8 space-y-6">
+                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                      <div className="p-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-900 flex items-center justify-center">
+                            <Icon name="hard-hat" size={18} />
+                          </div>
+                          <div>
+                            <h2 className="text-sm font-bold text-gray-800">YOLOv8 PPE Detection & Auto-Labeling Viewport</h2>
+                            <p className="text-[11px] text-gray-500">ตรวจจับ {activeClassCount} คลาสจากโมเดล {status.model_name} และส่งออก YOLO Label ตามหมายเลขในโมเดล</p>
+                          </div>
+                        </div>
+
+                        {/* 4 Testing Modes */}
+                        <div className="inline-flex flex-wrap rounded-lg bg-slate-100 p-1 text-xs font-semibold gap-1">
+                          <button
+                            onClick={() => setCameraMode('image-test')}
+                            className={`px-3 py-1.5 rounded-md transition-all ${
+                              cameraMode === 'image-test' ? 'bg-blue-900 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                          >
+                            1. ทดสอบรูปภาพ (Image)
+                          </button>
+                          <button
+                            onClick={() => setCameraMode('video-upload')}
+                            className={`px-3 py-1.5 rounded-md transition-all ${
+                              cameraMode === 'video-upload' ? 'bg-blue-900 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                          >
+                            2. ทดสอบวิดีโอ (Video .mp4)
+                          </button>
+                          <button
+                            onClick={() => setCameraMode('browser')}
+                            className={`px-3 py-1.5 rounded-md transition-all ${
+                              cameraMode === 'browser' ? 'bg-blue-900 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                          >
+                            3. กล้อง Webcam
+                          </button>
+                          <button
+                            onClick={() => setCameraMode('backend')}
+                            className={`px-3 py-1.5 rounded-md transition-all ${
+                              cameraMode === 'backend' ? 'bg-blue-900 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                          >
+                            4. กล้อง CCTV / พาธไฟล์
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Sub-toolbar per mode */}
+                      <div className="px-4 py-3 bg-slate-50 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
+                        {cameraMode === 'image-test' && (
+                          <div className="flex items-center justify-between w-full flex-wrap gap-2">
+                            <span className="text-xs text-gray-600">
+                              เลือกรูปภาพเพื่อทดสอบโมเดล {activeClassCount} คลาส พร้อมสร้างไฟล์ Label อัตโนมัติ
+                            </span>
+                            <label className="px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold flex items-center gap-2 cursor-pointer shadow-sm">
+                              <Icon name="upload" size={14} />
+                              <span>{isUploading ? 'กำลังประมวลผล...' : 'อัปโหลดรูปภาพเพื่อให้โมเดล Label'}</span>
+                              <input type="file" accept="image/*" multiple onChange={handleImageUploadTest} className="hidden" />
+                            </label>
+                          </div>
+                        )}
+
+                        {cameraMode === 'video-upload' && (
+                          <div className="flex items-center justify-between w-full flex-wrap gap-2">
+                            <span className="text-xs text-gray-600">
+                              อัปโหลดไฟล์วิดีโอ (.mp4, .avi) หรือกดปุ่มทดสอบวิดีโอตัวอย่างเพื่อให้โมเดลตีกรอบ PPE แบบ Real-Time
+                            </span>
+                            <div className="flex items-center flex-wrap gap-2">
+                              <button
+                                onClick={handlePlaySampleVideo}
+                                className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm"
+                              >
+                                <Icon name="play-circle" size={14} /> เล่นวิดีโอตัวอย่าง (Safety Helmet Videos.mp4)
+                              </button>
+                              <label className="px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold flex items-center gap-2 cursor-pointer shadow-sm">
+                                <Icon name="film" size={14} />
+                                <span>{isUploading ? 'กำลังอัปโหลด...' : 'เลือกไฟล์วิดีโอ (.mp4)'}</span>
+                                <input type="file" accept="video/*" onChange={handleVideoUpload} className="hidden" />
+                              </label>
+                              <button
+                                onClick={handleExportLabeledVideo}
+                                disabled={isExportingVideo}
+                                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm"
+                              >
+                                <Icon name="download" size={14} />
+                                <span>{isExportingVideo ? 'กำลังบันทึก .mp4...' : 'ส่งออกไฟล์วิดีโอที่ Label แล้ว (.mp4)'}</span>
+                              </button>
+                              {status.is_running && (
+                                <button
+                                  onClick={stopBackendCamera}
+                                  className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5"
+                                >
+                                  <Icon name="square" size={14} /> หยุดวิดีโอ
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {cameraMode === 'browser' && (
+                          <div className="flex items-center justify-between w-full flex-wrap gap-2">
+                            <span className="text-xs text-gray-600">
+                              เปิดกล้อง Webcam บนเครื่องเพื่อทดสอบการตรวจจับหมวกนิรภัยและเสื้อสะท้อนแสงแบบสด
+                            </span>
+                            {!browserStreamActive ? (
+                              <button
+                                onClick={startBrowserWebcam}
+                                className="px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold flex items-center gap-2 shadow-sm"
+                              >
+                                <Icon name="play" size={14} /> เปิดกล้อง Webcam
+                              </button>
+                            ) : (
+                              <button
+                                onClick={stopBrowserWebcam}
+                                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold flex items-center gap-2 shadow-sm"
+                              >
+                                <Icon name="square" size={14} /> หยุดกล้อง
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {cameraMode === 'backend' && (
+                          <div className="flex items-center gap-2 w-full flex-wrap">
+                            <input
+                              type="text"
+                              value={rtspSource}
+                              onChange={e => setRtspSource(e.target.value)}
+                              placeholder="ใส่ 0 สำหรับ USB Camera หรือ rtsp://... หรือ พาธไฟล์วิดีโอในเครื่อง"
+                              className="flex-1 min-w-[240px] px-3 py-1.5 text-xs bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-blue-900"
+                            />
+                            {!status.is_running ? (
+                              <button
+                                onClick={startBackendCamera}
+                                className="px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm"
+                              >
+                                <Icon name="play" size={14} /> เริ่มสตรีม
+                              </button>
+                            ) : (
+                              <button
+                                onClick={stopBackendCamera}
+                                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm"
+                              >
+                                <Icon name="square" size={14} /> หยุดสตรีม
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {cameraError && (
+                        <div className="px-4 py-2.5 bg-red-50 border-b border-red-100 text-red-700 text-xs flex items-center gap-2">
+                          <Icon name="alert-triangle" size={15} />
+                          <span>{cameraError}</span>
+                        </div>
+                      )}
+
+                      {/* Main Display Canvas */}
+                      <div className="relative bg-[#0b1520] min-h-[440px] flex items-center justify-center overflow-hidden">
+                        {cameraMode === 'image-test' && (
+                          selectedTestResult ? (
+                            <img src={selectedTestResult.annotated_base64} alt="Test Result" className="max-h-[490px] w-auto object-contain" />
+                          ) : (
+                            <div className="text-center p-8 space-y-3">
+                              <div className="w-14 h-14 rounded-2xl bg-slate-800/90 text-blue-400 flex items-center justify-center mx-auto border border-slate-700">
+                                <Icon name="image-plus" size={28} />
+                              </div>
+                              <p className="text-slate-200 font-semibold text-sm">อัปโหลดรูปภาพเพื่อให้โมเดลตรวจจับและตีกรอบ PPE</p>
+                              <p className="text-slate-400 text-xs max-w-md mx-auto">
+                                กดปุ่ม "อัปโหลดรูปภาพเพื่อให้โมเดล Label" ด้านบน รองรับการเลือกหลายรูปพร้อมกัน พร้อมส่งออกพิกัด YOLO `.txt` อัตโนมัติ
+                              </p>
+                            </div>
+                          )
+                        )}
+
+                        {(cameraMode === 'video-upload' || cameraMode === 'backend') && (
+                          status.is_running ? (
+                            <img src="/api/video_feed" alt="Live Video Feed" className="max-h-[490px] w-auto object-contain" />
+                          ) : (
+                            <div className="text-center p-8 space-y-3">
+                              <div className="w-14 h-14 rounded-2xl bg-slate-800/90 text-amber-400 flex items-center justify-center mx-auto border border-slate-700">
+                                <Icon name="film" size={28} />
+                              </div>
+                              <p className="text-slate-200 font-semibold text-sm">พร้อมวิเคราะห์และตีกรอบ PPE บนไฟล์วิดีโอ (.mp4)</p>
+                              <p className="text-slate-400 text-xs max-w-md mx-auto">
+                                กดปุ่ม "เล่นวิดีโอตัวอย่าง (Safety Helmet Videos.mp4)" หรืออัปโหลดไฟล์วิดีโอของคุณด้านบน
+                              </p>
+                            </div>
+                          )
+                        )}
+
+                        {cameraMode === 'browser' && (
+                          browserStreamActive && browserAnnotatedFrame ? (
+                            <img src={browserAnnotatedFrame} alt="Webcam Stream" className="max-h-[490px] w-auto object-contain" />
+                          ) : (
+                            <div className="text-center p-8 space-y-3">
+                              <div className="w-14 h-14 rounded-2xl bg-slate-800/90 text-blue-400 flex items-center justify-center mx-auto border border-slate-700">
+                                <Icon name="camera" size={28} />
+                              </div>
+                              <p className="text-slate-200 font-semibold text-sm">โหมดทดสอบผ่านกล้อง Webcam</p>
+                              <p className="text-slate-400 text-xs max-w-md mx-auto">
+                                กดปุ่ม "เปิดกล้อง Webcam" ด้านบนเพื่อส่งภาพสดเข้าโมเดลตรวจจับ PPE
+                              </p>
+                            </div>
+                          )
+                        )}
+                      </div>
+
+                      {/* Threshold Bar */}
+                      <div className="p-4 bg-white border-t border-gray-100 flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 flex-1 min-w-[260px]">
+                          <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">
+                            เกณฑ์ความมั่นใจ (Confidence Threshold): <strong className="text-blue-900">{Math.round(status.threshold * 100)}%</strong>
+                          </span>
+                          <input
+                            type="range"
+                            min="0.10"
+                            max="0.90"
+                            step="0.05"
+                            value={status.threshold}
+                            onChange={e => handleThresholdChange(e.target.value)}
+                            className="w-full max-w-xs accent-blue-900 cursor-pointer"
+                          />
+                        </div>
+                        <ClassLegend classes={displayedClasses} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right 4 Cols: Class Count Breakdown, YOLO Label Output & Tested Images Queue */}
+                  <div className="lg:col-span-4 space-y-6">
+                    {/* Card 1: Detected Objects & Auto-Generated YOLO Labels */}
+                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-4">
+                      <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                        <div className="flex items-center gap-2">
+                          <Icon name="box-select" size={17} className="text-blue-900" />
+                          <h3 className="text-sm font-bold text-gray-800">Detected Objects & Auto-Labels</h3>
+                        </div>
+                        <span className="text-xs font-bold text-blue-900 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
+                          {pred.total_boxes || 0} Boxes
+                        </span>
+                      </div>
+
+                      <ClassCounts classes={displayedClasses} counts={counts} />
+
+                      {/* YOLO .txt format preview */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-gray-700">YOLO Label Format (class x_c y_c w h):</span>
+                          {cameraMode === 'image-test' && selectedTestResult?.label_url && (
+                            <a
+                              href={selectedTestResult.label_url}
+                              download
+                              className="text-blue-900 hover:underline font-semibold inline-flex items-center gap-1"
+                            >
+                              <Icon name="download" size={12} /> ดาวน์โหลด .txt
+                            </a>
+                          )}
+                        </div>
+                        <textarea
+                          readOnly
+                          rows={4}
+                          value={pred.yolo_labels_txt || "# ยังไม่มีวัตถุที่ตรวจพบในเฟรมนี้"}
+                          className="w-full p-2.5 text-[11px] font-mono bg-slate-900 text-emerald-400 rounded-lg border border-slate-700 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Card 2: Tested Images History List */}
+                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                      <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Icon name="images" size={16} className="text-blue-900" />
+                          <h3 className="text-sm font-bold text-gray-800">รายการภาพที่ Label แล้ว ({testResults.length})</h3>
+                        </div>
+                        {testResults.length > 0 && (
+                          <button
+                            onClick={() => { setTestResults([]); setSelectedTestResult(null); }}
+                            className="text-xs text-gray-400 hover:text-red-600"
+                          >
+                            ล้างรายการ
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="p-3 max-h-[270px] overflow-y-auto space-y-2 modern-scrollbar">
+                        {testResults.length === 0 ? (
+                          <div className="py-8 text-center text-xs text-gray-400">
+                            ยังไม่มีรูปภาพที่อัปโหลดทดสอบ
+                          </div>
+                        ) : (
+                          testResults.map((item, idx) => (
+                            <div
+                              key={idx}
+                              onClick={() => { setCameraMode('image-test'); setSelectedTestResult(item); }}
+                              className={`p-2.5 rounded-lg border cursor-pointer transition-all flex items-center justify-between gap-3 ${
+                                selectedTestResult === item
+                                  ? 'border-blue-900 bg-blue-50/40'
+                                  : 'border-gray-100 bg-slate-50/70 hover:bg-slate-100/70'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <img
+                                  src={item.annotated_base64}
+                                  alt={item.filename}
+                                  className="w-12 h-12 rounded-lg object-cover border border-gray-200 shrink-0"
+                                />
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold text-gray-800 truncate">{item.filename}</p>
+                                  <p className="text-[11px] text-gray-500">
+                                    <CountSummary counts={item.prediction.counts} />
+                                  </p>
+                                </div>
+                              </div>
+                              <StatusBadge status={item.prediction.compliance_status} />
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom Full-Width Table: Detection & Auto-Label Logs */}
+                  <div className="lg:col-span-12">
+                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                      <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Icon name="activity" size={17} className="text-blue-900" />
+                          <h3 className="text-sm font-bold text-gray-800">
+                            ประวัติการตรวจจับและสร้าง Label (PPE Detection & Auto-Labeling Logs)
+                          </h3>
+                        </div>
+                        <button
+                          onClick={async () => { await fetch('/api/logs', { method: 'DELETE' }); fetchAllData(); }}
+                          className="text-xs text-gray-500 hover:text-red-600 font-medium"
+                        >
+                          ล้างประวัติ
+                        </button>
+                      </div>
+
+                      <div className="overflow-x-auto max-h-[260px] modern-scrollbar">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-gray-100 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                              <th className="py-2.5 px-4">เวลา (Timestamp)</th>
+                              <th className="py-2.5 px-4">สถานะ PPE</th>
+                              <th className="py-2.5 px-4">Detected classes</th>
+                              <th className="py-2.5 px-4">รายละเอียด</th>
+                              <th className="py-2.5 px-4 text-right">ไฟล์ภาพ & Label</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 text-xs">
+                            {logs.length === 0 ? (
+                              <tr>
+                                <td colSpan="5" className="py-8 text-center text-gray-400">ยังไม่มีประวัติการทดสอบ</td>
+                              </tr>
+                            ) : (
+                              logs.map(log => (
+                                <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
+                                  <td className="py-2.5 px-4 font-mono text-gray-500 whitespace-nowrap">{log.timestamp}</td>
+                                  <td className="py-2.5 px-4"><StatusBadge status={log.type} /></td>
+                                  <td className="py-2.5 px-4 text-gray-600 min-w-[200px]">
+                                    {log.type !== 'SYSTEM' ? <CountSummary counts={log.counts} /> : '—'}
+                                  </td>
+                                  <td className="py-2.5 px-4 text-gray-600">{log.message}</td>
+                                  <td className="py-2.5 px-4 text-right space-x-1.5 whitespace-nowrap">
+                                    {log.snapshot_url ? (
+                                      <>
+                                        <button
+                                          onClick={() => setModalImage(log)}
+                                          className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-md font-semibold text-[11px] inline-flex items-center gap-1"
+                                        >
+                                          <Icon name="image" size={12} /> ดูภาพ
+                                        </button>
+                                        {log.label_url && (
+                                          <a
+                                            href={log.label_url}
+                                            download
+                                            className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-md font-semibold text-[11px] inline-flex items-center gap-1"
+                                          >
+                                            <Icon name="file-text" size={12} /> .txt
+                                          </a>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <span className="text-gray-300">-</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ==================== PAGE 2: LABELED CAPTURES GALLERY ==================== */}
+              {activePage === 'alert-logs' && (
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="p-5 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
+                    <div>
+                      <h2 className="text-base font-bold text-gray-800">คลังภาพและเฟรมวิดีโอที่ตีกรอบ PPE แล้วทั้งหมด</h2>
+                      <p className="text-xs text-gray-500">คลิกที่รูปภาพเพื่อขยายดูรายละเอียดและดาวน์โหลดไฟล์ YOLO Label (.txt)</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => fetch('/api/open_captures', { method: 'POST' })}
+                        className="px-4 py-2 bg-blue-900 text-white rounded-lg text-xs font-semibold flex items-center gap-2"
+                      >
+                        <Icon name="folder-open" size={14} /> เปิดโฟลเดอร์เก็บภาพในเครื่อง
+                      </button>
+                      <button
+                        onClick={() => fetch('/api/open_labels', { method: 'POST' })}
+                        className="px-4 py-2 bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-2"
+                      >
+                        <Icon name="file-text" size={14} /> เปิดโฟลเดอร์ YOLO Labels (.txt)
+                      </button>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {logs.filter(l => l.snapshot_url).length === 0 ? (
+                        <div className="col-span-full py-12 text-center text-gray-400 text-sm">
+                          ยังไม่มีภาพที่ถูกบันทึกไว้
+                        </div>
+                      ) : (
+                        logs.filter(l => l.snapshot_url).map(log => (
+                          <div key={log.id} className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+                            <img
+                              src={log.snapshot_url}
+                              alt="Labeled PPE"
+                              className="w-full h-48 object-cover cursor-pointer"
+                              onClick={() => setModalImage(log)}
+                            />
+                            <div className="p-3.5 space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <StatusBadge status={log.type} />
+                                <span className="text-xs font-bold text-gray-700">
+                                  Boxes: {log.total_boxes}
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-600">
+                                <CountSummary counts={log.counts} />
+                              </p>
+                              <div className="flex items-center justify-between pt-1">
+                                <span className="text-[11px] text-gray-400">{log.timestamp}</span>
+                                {log.label_url && (
+                                  <a href={log.label_url} download className="text-xs font-semibold text-blue-900 hover:underline">
+                                    ดาวน์โหลด .txt
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ==================== PAGE 3: MODEL SPECS & NOTEBOOK EVALUATION ==================== */}
+              {activePage === 'model-info' && (
+                <div className="space-y-6">
+                  <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4">
+                    <div className="flex items-center justify-between flex-wrap gap-3">
+                      <div>
+                        <h2 className="text-base font-bold text-gray-800">ข้อมูลจำเพาะของโมเดล (PPE Model Configuration & Weights)</h2>
+                        <p className="text-xs text-gray-500">คุณสามารถสลับหรืออัปโหลดไฟล์โมเดล `.pt` หรือ `.onnx` (เช่น `best.pt` จาก Kaggle Notebook) ได้ตลอดเวลา</p>
+                      </div>
+                      <label className="px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold flex items-center gap-2 cursor-pointer shadow-sm">
+                        <Icon name="upload-cloud" size={15} />
+                        <span>อัปโหลดไฟล์โมเดลใหม่ (.pt / .onnx)</span>
+                        <input type="file" accept=".pt,.onnx" onChange={handleModelUpload} className="hidden" />
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                      <div className="p-4 rounded-xl bg-slate-50 border border-gray-200 space-y-2">
+                        <p className="text-gray-500">ชื่อไฟล์โมเดลที่กำลังใช้งาน (Active Model File):</p>
+                        <p className="text-sm font-bold text-gray-900">{status.model_name}</p>
+                        <p className="text-gray-500 pt-2">ประเภทงาน (Ultralytics Task):</p>
+                        <p className="text-sm font-bold text-blue-900">Object Detection & Auto-Labeling (`detect`)</p>
+                      </div>
+                      <div className="p-4 rounded-xl bg-slate-50 border border-gray-200 space-y-2">
+                        <p className="text-gray-500">คลาสจากโมเดลที่กำลังใช้งาน ({activeClassCount} Classes):</p>
+                        <div className="grid grid-cols-2 gap-1.5 pt-1">
+                          {Object.entries(status.classes || {}).map(([id, name]) => (
+                            <div key={id} className="p-2 rounded bg-white border border-gray-200 text-gray-700 font-semibold" style={{ borderLeft: `3px solid ${classColor(name)}` }}>
+                              Class ID {id}: {name}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {report && (
+                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-3">
+                      <h2 className="text-base font-bold text-gray-800">Active model — Kaggle validation</h2>
+                      <div className="flex flex-wrap gap-5 text-sm text-gray-600">
+                        <span>Training: <strong>{report.recorded_training_epochs} / {report.target_epochs} epochs</strong></span>
+                        <span>mAP@50: <strong>{(Number(report.best_validation?.['metrics/mAP50(B)'] || 0) * 100).toFixed(1)}%</strong></span>
+                        <span>mAP@50–95: <strong>{(Number(report.best_validation?.['metrics/mAP50-95(B)'] || 0) * 100).toFixed(1)}%</strong></span>
+                      </div>
+                      <p className="text-xs text-gray-500">ผลบน validation ของโมเดลที่กำลังใช้ · การตรวจสถานะหมวกยังเทียบจำนวนคนกับหมวกเท่านั้น</p>
+                    </div>
+                  )}
+
+                  {/* Notebook Training Results & Charts extracted from ppe-detection.ipynb */}
+                  <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4">
+                    <h2 className="text-base font-bold text-gray-800">ผลการทดลองเดิม 3 คลาสจาก `ppe-detection.ipynb` (คนละโมเดลกับที่กำลังใช้งาน)</h2>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <div className="border border-gray-200 rounded-xl p-4 space-y-2">
+                        <h3 className="text-xs font-bold text-gray-700 uppercase">Training & Validation Metrics (`results.png`)</h3>
+                        <img src="/static/assets/results.png" alt="Training Results" className="w-full rounded-lg border border-gray-100" />
+                      </div>
+                      <div className="border border-gray-200 rounded-xl p-4 space-y-2">
+                        <h3 className="text-xs font-bold text-gray-700 uppercase">Confusion Matrix (`confusion_matrix.png`)</h3>
+                        <img src="/static/assets/confusion_matrix.png" alt="Confusion Matrix" className="w-full rounded-lg border border-gray-100" />
+                      </div>
+                      <div className="border border-gray-200 rounded-xl p-4 space-y-2">
+                        <h3 className="text-xs font-bold text-gray-700 uppercase">Validation Batch Predictions (`val_batch2_pred.jpg`)</h3>
+                        <img src="/static/assets/val_batch2_pred.jpg" alt="Validation Batch" className="w-full rounded-lg border border-gray-100" />
+                      </div>
+                      <div className="border border-gray-200 rounded-xl p-4 space-y-2">
+                        <h3 className="text-xs font-bold text-gray-700 uppercase">Sample Image Inference from Notebook</h3>
+                        <img src="/static/assets/notebook_test_result.png" alt="Sample Inference" className="w-full rounded-lg border border-gray-100" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </main>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,14 @@
+# Reference class schema. The training notebook generates actual dataset paths.
+train: images/train
+val: images/val
+names:
+  0: person
+  1: ear-mufs
+  2: face-mask
+  3: foot
+  4: glasses
+  5: gloves
+  6: helmet
+  7: shoes
+  8: safety-suit
+  9: safety-vest

@@ -1,0 +1,12 @@
+import { AlertTriangle, Ban, Check, Camera, Inbox } from 'lucide-react';
+import type { Alert } from '../types';
+import { formatDate } from '../geometry';
+import { Badge } from './ui';
+
+export default function AlertFeed({ alerts, onAcknowledge, onSnapshot, compact = false }: { alerts: Alert[]; onAcknowledge: (alert: Alert) => void; onSnapshot: (alert: Alert) => void; compact?: boolean }) {
+  if (!alerts.length) return <div className="text-center p-10"><Inbox size={28} className="mx-auto text-gray-300 mb-3" /><p className="text-xs font-semibold text-gray-600">No alerts recorded</p><p className="text-[11px] text-gray-400 mt-1.5">Events appear here when a zone rule is violated.</p></div>;
+  return <div className={`${compact ? 'max-h-[380px] overflow-y-auto modern-scrollbar' : ''} divide-y divide-gray-100`}>{alerts.map(alert => <article key={alert.id} className={`flex items-start gap-3 px-4 py-3.5 ${!alert.acknowledged_at ? 'bg-red-50/20' : ''}`}>
+    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${alert.kind === 'intrusion' ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-red-600'}`}>{alert.kind === 'intrusion' ? <Ban size={16} /> : <AlertTriangle size={16} />}</div>
+    <div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><p className="text-xs font-bold text-gray-800">{alert.kind === 'intrusion' ? 'Restricted zone intrusion' : 'Missing required PPE'}</p><time className="text-[10px] text-gray-400 whitespace-nowrap">{formatDate(alert.created_at)}</time></div><p className="text-[11px] text-gray-600 mt-1 break-words"><strong>{alert.zone_name}</strong> · Person #{alert.track_id}{alert.missing_classes.length ? ` · ${alert.missing_classes.join(', ')}` : ''}</p><div className="mt-2 flex items-center justify-between gap-2 flex-wrap"><div className="flex items-center gap-1.5"><Badge tone={alert.resolved_at ? 'slate' : 'red'}>{alert.resolved_at ? 'Closed' : 'Active'}</Badge>{alert.acknowledged_at && <Badge tone="blue"><Check size={10} />Acknowledged</Badge>}</div><div className="flex gap-3"><button className="text-[10px] font-semibold text-gray-500 hover:text-blue-900 inline-flex gap-1 items-center disabled:opacity-40" disabled={!alert.snapshot_url} onClick={() => onSnapshot(alert)}><Camera size={11} />Snapshot</button>{!alert.acknowledged_at && <button className="text-[10px] font-semibold text-blue-900 hover:text-blue-600" onClick={() => onAcknowledge(alert)}>Acknowledge</button>}</div></div></div>
+  </article>)}</div>;
+}
