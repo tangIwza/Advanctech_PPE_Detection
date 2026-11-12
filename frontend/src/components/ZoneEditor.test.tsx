@@ -44,4 +44,24 @@ describe('dynamic zone PPE selection', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Select at least one');
     expect(save).not.toHaveBeenCalled();
   });
+  it('preserves polygon points and recalculates bounds after editing a point', async () => {
+    const save=vi.fn().mockResolvedValue(undefined);
+    const points=[{x:.1,y:.1},{x:.9,y:.1},{x:.1,y:.9}];
+    render(<ZoneEditor {...props} shape="polygon" points={points} onSave={save} />);
+    expect(screen.queryByRole('spinbutton',{name:'x1'})).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('spinbutton',{name:'Point 2 x'}),{target:{value:'.8'}});
+    fireEvent.click(screen.getByRole('button',{name:'Save zone'}));
+    await waitFor(()=>expect(save).toHaveBeenCalledOnce());
+    expect(save.mock.calls[0][0].shape).toBe('polygon');
+    expect(save.mock.calls[0][0].points[1]).toEqual({x:.8,y:.1});
+    expect(save.mock.calls[0][0].rect).toEqual({x1:.1,y1:.1,x2:.8,y2:.9});
+  });
+  it('blocks a self-intersecting polygon before sending rules', async () => {
+    const save=vi.fn();
+    const points=[{x:0,y:0},{x:1,y:1},{x:0,y:1},{x:1,y:0}];
+    render(<ZoneEditor {...props} shape="polygon" points={points} onSave={save} />);
+    fireEvent.click(screen.getByRole('button',{name:'Save zone'}));
+    expect(await screen.findByRole('alert')).toHaveTextContent('cannot cross');
+    expect(save).not.toHaveBeenCalled();
+  });
 });

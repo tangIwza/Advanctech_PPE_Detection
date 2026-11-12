@@ -5,8 +5,8 @@ The reference UI was inspected before frontend implementation; see [UI_THEME.md]
 
 | Check | Result |
 | --- | --- |
-| `python -X utf8 -B -m pytest backend/tests -q` | **22 passed** |
-| `npm test` | **11 passed**, 3 test files |
+| `python -X utf8 -B -m pytest backend/tests -q` | **34 passed** |
+| `npm test` | **21 passed**, 4 test files |
 | `npm run build` | TypeScript check and Vite production build passed |
 | `npx --yes npm@11.6.2 ci --no-fund` | Clean lockfile install passed |
 | npm dependency audit after Vitest 4.1.12 patch | **0 vulnerabilities** reported |
@@ -68,6 +68,30 @@ Screenshots:
 - [Desktop monitoring](screenshots/monitoring-desktop.jpg)
 - [Dark monitoring](screenshots/monitoring-dark.jpg)
 - [Mobile zone editor](screenshots/zone-editor-mobile.jpg)
+
+## Polygon drawing update
+
+The original rectangle-only application was published before the polygon work:
+commit 51a62eef4c8431f2e970dfb73e67c68b0d550358.
+
+Added tests cover concave polygon membership, inclusive boundaries, reversed winding,
+anchor points, invalid/crossing outlines, persistence, geometry conversion and legacy
+rectangles, actual polygon snapshot edges, click-to-close, undo, Enter/Escape,
+switching drawing modes, reverse-drag rectangles and editing vertex coordinates.
+
+A browser test used the actual model on port 8001 with a separate
+.runtime/polygon-preview data directory. It clicked six vertices, used Undo, closed
+the polygon by clicking its first point, edited coordinates, and saved a restricted
+polygon alongside a rectangle PPE zone. Both intrusion and missing-PPE events were
+observed. Its snapshot opened and both shapes persisted after a page reload.
+The mobile document width equalled its 390px viewport and no console warnings/errors
+were captured. See [validation-polygon.json](validation-polygon.json),
+[pen preview](screenshots/polygon-drawing.jpg) and [saved zones](screenshots/polygon-zones.jpg).
+
+The user's port-8000 application was restarted with the new backend. Its existing
+rectangle zone and rules were verified and its sample video returned to the prior
+paused state. The new drawing controls were verified there. The isolated port-8001
+preview was stopped.
 
 ## Practical limits
 

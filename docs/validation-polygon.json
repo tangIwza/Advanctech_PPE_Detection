@@ -1,0 +1,78 @@
+{
+  "backend_tests": 34,
+  "frontend_tests": 21,
+  "production_build": "passed",
+  "test_data": "isolated .runtime/polygon-preview directory",
+  "real_model": "b1a4c6457086c77f90c8dab5ebf65086f507b380357844bb72486e076f57c984",
+  "zones": [
+    {
+      "source_id": "sample-video",
+      "name": "Polygon no-entry demo",
+      "kind": "restricted",
+      "shape": "polygon",
+      "rect": {
+        "x1": 0.27986016456451435,
+        "y1": 0.09917843113755838,
+        "x2": 0.8204991657090106,
+        "y2": 1.0
+      },
+      "points": [
+        {
+          "x": 0.27986016456451435,
+          "y": 0.09917843113755838
+        },
+        {
+          "x": 0.7502690993838678,
+          "y": 0.1510056322942841
+        },
+        {
+          "x": 0.8204991657090106,
+          "y": 0.5491327684527679
+        },
+        {
+          "x": 0.7502690993838678,
+          "y": 1.0
+        },
+        {
+          "x": 0.27986016456451435,
+          "y": 1.0
+        },
+        {
+          "x": 0.35009023088965724,
+          "y": 0.5491327684527679
+        }
+      ],
+      "required_class_ids": [],
+      "anchor": "feet",
+      "enabled": true,
+      "id": "1fce65232c8846b0a2dfb7b0602079e7",
+      "version": 1,
+      "updated_at": "2026-11-12T15:49:37.669866+00:00"
+    },
+    {
+      "source_id": "sample-video",
+      "name": "Rectangle PPE demo",
+      "kind": "ppe",
+      "shape": "rectangle",
+      "rect": {
+        "x1": 0.11952359804862205,
+        "y1": 0.12038046797440072,
+        "x2": 0.9397577689026495,
+        "y2": 1.0
+      },
+      "points": null,
+      "required_class_ids": [
+        6,
+        9
+      ],
+      "anchor": "feet",
+      "enabled": true,
+      "id": "ba78bedb9328420b88e43b4ea1fc9a51",
+      "version": 1,
+      "updated_at": "2026-11-12T15:50:33.348274+00:00"
+    }
+  ],
+  "intrusion_events": 44,
+  "missing_ppe_events": 34,
+  "note": "Repeated sample-video loops; event totals are not unique people or validated incidents."
+}

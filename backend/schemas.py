@@ -1,5 +1,6 @@
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from .geometry import validate_polygon
 
 
 class StrictModel(BaseModel):
@@ -19,17 +20,32 @@ class Rect(StrictModel):
         return self
 
 
+class Point(StrictModel):
+    x: float = Field(ge=0, le=1)
+    y: float = Field(ge=0, le=1)
+
+
 class ZoneInput(StrictModel):
     source_id: str = Field(min_length=1, max_length=120)
     name: str = Field(min_length=1, max_length=80)
     kind: Literal["ppe", "restricted"]
-    rect: Rect
+    shape: Literal["rectangle", "polygon"] = "rectangle"
+    rect: Rect | None = None
+    points: list[Point] | None = Field(default=None, min_length=3, max_length=64)
     required_class_ids: list[int] = Field(default_factory=list, max_length=20)
     anchor: Literal["feet", "centroid"] = "feet"
     enabled: bool = True
 
     @model_validator(mode="after")
     def meaningful(self):
+        if self.shape == "polygon":
+            if not self.points:
+                raise ValueError("Polygon zones require points")
+            validate_polygon([(point.x, point.y) for point in self.points])
+            self.rect = Rect(x1=min(point.x for point in self.points), y1=min(point.y for point in self.points),
+                             x2=max(point.x for point in self.points), y2=max(point.y for point in self.points))
+        elif self.rect is None or self.points is not None:
+            raise ValueError("Rectangle zones require rect and must not contain polygon points")
         self.name = self.name.strip()
         if not self.name:
             raise ValueError("Zone name cannot be blank")
@@ -52,6 +68,8 @@ class ZonePatch(StrictModel):
     name: str | None = Field(default=None, min_length=1, max_length=80)
     kind: Literal["ppe", "restricted"] | None = None
     rect: Rect | None = None
+    shape: Literal["rectangle", "polygon"] | None = None
+    points: list[Point] | None = Field(default=None, min_length=3, max_length=64)
     required_class_ids: list[int] | None = Field(default=None, max_length=20)
     anchor: Literal["feet", "centroid"] | None = None
     enabled: bool | None = None

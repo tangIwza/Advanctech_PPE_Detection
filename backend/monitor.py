@@ -7,6 +7,7 @@ from urllib.parse import urlsplit
 import uuid
 
 import cv2
+import numpy as np
 
 from .config import ROOT
 from .rules import PersonTracker, evaluate_zones
@@ -26,7 +27,11 @@ def draw_overlay(frame, detections, zones, evaluation):
         color = (68, 68, 239) if zone.id in red_zones else (30, 160, 245) if zone.kind == "restricted" else (100, 190, 30)
         r = zone.rect
         a, b = (int(r.x1*w), int(r.y1*h)), (int(r.x2*w), int(r.y2*h))
-        cv2.rectangle(image, a, b, color, 2)
+        if zone.shape == "polygon":
+            vertices = np.array([(round(point.x*w), round(point.y*h)) for point in zone.points], dtype=np.int32)
+            cv2.polylines(image, [vertices], True, color, 2, cv2.LINE_AA)
+        else:
+            cv2.rectangle(image, a, b, color, 2)
         cv2.putText(image, zone.name.encode("ascii", "replace").decode()[:35], (a[0]+4, min(h-8, a[1]+20)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)
     for item in detections:
         a, b = (int(item.bbox[0]*w), int(item.bbox[1]*h)), (int(item.bbox[2]*w), int(item.bbox[3]*h))

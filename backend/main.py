@@ -221,7 +221,7 @@ def create_app(settings=None, detector_factory=Detector):
         old = app.state.store.zone(zone_id)
         changes = value.model_dump(exclude_unset=True)
         expected = changes.pop("expected_version", None)
-        if any(item is None for item in changes.values()):
+        if any(item is None for key, item in changes.items() if key != "points"):
             raise HTTPException(422, "Zone fields cannot be null")
         try:
             merged = ZoneInput.model_validate({**old.model_dump(exclude={"id", "version", "updated_at"}), **changes})

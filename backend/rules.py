@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import math
 
 from .schemas import Zone
+from .geometry import point_in_polygon
 
 PERSON_NAMES = {"person", "people", "human", "pedestrian", "worker"}
 BODY_PARTS = {"ear", "face", "foot", "feet", "hands", "hand", "head"}
@@ -99,7 +100,9 @@ def inside(person, zone):
     x1, y1, x2, y2 = person.bbox
     point = ((x1 + x2) / 2, y2 if zone.anchor == "feet" else (y1 + y2) / 2)
     rect = zone.rect
-    return rect.x1 <= point[0] <= rect.x2 and rect.y1 <= point[1] <= rect.y2
+    if not (rect.x1 <= point[0] <= rect.x2 and rect.y1 <= point[1] <= rect.y2):
+        return False
+    return zone.shape == "rectangle" or point_in_polygon(point, [(vertex.x, vertex.y) for vertex in zone.points])
 
 
 def evaluate_zones(detections, zones: list[Zone], person_ids, ppe_ids, threshold=0.5):

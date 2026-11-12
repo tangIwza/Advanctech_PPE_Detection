@@ -13,6 +13,7 @@ frontend/dist/
 captures/
 labels_out/
 uploads/
+factory_warehouse_footage/
 kaggle_output/
 backups/
 *.pt

@@ -75,14 +75,20 @@ FastAPI จะเสิร์ฟ `frontend/dist` พร้อม API และ W
 2. โหมด **Live camera** ใช้ดัชนีกล้อง `0` หรือ URL `rtsp://`, `rtsps://`,
    `http://`, `https://` กด Start monitoring
    Webcam คือกล้องบนเครื่องที่รัน backend ไม่ใช่กล้องของ browser ฝั่งผู้ชม
-3. กด **Draw zone** แล้วลากกรอบสี่เหลี่ยมบนภาพ ตั้งชื่อและเลือกประเภท:
+3. เลือกโหมดวาดแล้วกด **Draw zone**:
+   - **Rectangle:** คลิกและลากกรอบสี่เหลี่ยมตามปกติ
+   - **Polygon / Pen:** คลิกวางจุดทีละมุม ปิดรูปด้วยการคลิกจุดแรก
+     หรือกด **Finish polygon** / Enter ใช้ Undo / Backspace ย้อนจุด และ Esc ยกเลิก
+     รองรับ 3–64 จุด รวมรูปเว้า โดยเส้นต้องไม่ตัดกัน
+4. หลังวาดเสร็จ ตั้งชื่อและเลือกกฎ (ใช้ได้กับทั้งสองรูปทรง):
    - **PPE compliance:** เลือก PPE ที่บังคับในโซน
    - **Restricted / no entry:** แจ้งเมื่อมีคนในโซน
-4. เลือกจุดอ้างอิงคน **Bottom-center** (ตำแหน่งเท้า) หรือ **Centroid**
+5. เลือกจุดอ้างอิงคน **Bottom-center** (ตำแหน่งเท้า) หรือ **Centroid**
    แล้ว Save zone กฎทำงานทันที ไม่ต้องเริ่มวิดีโอใหม่
-5. เปิด/ปิด แก้ไข ลากกรอบใหม่ หรือลบโซนจากการ์ด Detection zones
+6. เปิด/ปิด แก้ไข วาดโซนใหม่ หรือลบโซนจากการ์ด Detection zones
    หรือหน้า Detection Zones โซนแต่ละชุดผูกกับ source แยกกัน
-6. ดูข้อความแจ้งเตือนสีแดง เปิด Snapshot, Acknowledge หรือ Export CSV
+   ใช้ Redraw zone แล้วเลือกอีกโหมดเพื่อเปลี่ยนรูปทรงของโซนเดิม
+7. ดูข้อความแจ้งเตือนสีแดง เปิด Snapshot, Acknowledge หรือ Export CSV
    ในหน้า Alert History เปิดเสียงได้ด้วยปุ่มลำโพงหลังมีการกดจากผู้ใช้
 
 มีโซนตัวอย่างชื่อ `Sample PPE check` และ `Sample no-entry area` ที่สร้างระหว่าง
@@ -111,7 +117,7 @@ FastAPI จะเสิร์ฟ `frontend/dist` พร้อม API และ W
 | 8 | safety-suit | PPE |
 | 9 | safety-vest | PPE |
 
-- คนอยู่ในโซนเมื่อจุดอ้างอิงอยู่ในกรอบ normalized `[0, 1]`
+- คนอยู่ในโซนเมื่อจุดอ้างอิงอยู่ภายในรูปทรงจริงที่มีพิกัด normalized `[0, 1]`
 - จับคู่ PPE ด้วย `intersection(person, PPE) / area(PPE)` ค่าเริ่มต้น 0.5
   เลือกเจ้าของที่เหมาะที่สุดเพียงคนเดียวต่อกล่อง PPE
 - ตรวจ required PPE แยกต่อคน; PPE ของคนอื่นไม่เติมรายการที่ขาดให้คนข้าง ๆ
@@ -150,7 +156,8 @@ OpenCV capture -> YOLO -> temporary person tracker -> per-zone rule engine
 - ภาพถูกย่อตามอัตราส่วน สูงสุด 1280×960; inference size เริ่มต้น 640
   วิดีโอข้ามบางเฟรมเมื่อประมวลผลไม่ทันเพื่อรักษาจังหวะการเล่นโดยประมาณ
   จำนวน FPS ขึ้นกับ CPU/GPU/กล้อง ไม่รับประกันทุกเฟรมของวิดีโอจะถูกตรวจ
-- normalized canvas รองรับลากย้อนทิศ หลายโซน resize, fullscreen และหน้าจอมือถือ
+- normalized canvas รองรับ Rectangle แบบลากย้อนทิศ และ Polygon แบบคลิกวางจุด
+  ใช้หลายรูปทรงร่วมกันได้ รองรับ resize, fullscreen และหน้าจอมือถือ
 - SQLite WAL: `backend/data/safety.sqlite3`; uploads และ snapshots อยู่ใต้ data เดียวกัน
   ข้อมูลคงอยู่เมื่อ restart; source จะไม่เปิดกล้องเองหลัง restart
 - เก็บ alerts สูงสุด 5,000 รายการ / 30 วัน pruning ตอน startup และเมื่อมี event ใหม่
@@ -259,3 +266,10 @@ Frontend tests ครอบคลุม geometry, dynamic PPE form และ fra
 [Ultralytics predict](https://docs.ultralytics.com/modes/predict/) และ
 [FastAPI WebSockets](https://fastapi.tiangolo.com/advanced/websockets/)
 
+
+
+## โซน Polygon / Pen
+
+Backend ตรวจตำแหน่งคนด้วย point-in-polygon ตามขอบรูปจริง รวมจุดบนขอบและรูปเว้า
+โดยทั้งสองโหมดใช้กฎ PPE และ Restricted ได้เหมือนกัน โซนสี่เหลี่ยมเดิมยังอ่านได้
+รายละเอียด API รูปทรง การแก้จุด และตัวอย่างอยู่ใน [docs/POLYGON_ZONES.md](docs/POLYGON_ZONES.md)
