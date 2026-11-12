@@ -30,3 +30,9 @@ scrollbars, and dark-mode overrides. The JTMX icon and logo are copied from the
 reference's public images. No reference business data, credentials, or mock
 records are copied. Application pages, controls, and notifications use real
 backend data rather than reference dashboard placeholders.
+
+Brand update: the sidebar wordmark is now **AiCS**, as requested. A custom navy-and-teal
+PPE hard-hat SVG replaces the reference symbol and is also used as
+the favicon. The wordmark is real text, black in light mode and white in dark mode;
+the Smart Safety & PPE tagline remains. The original JTMX brand assets are no
+longer shipped by the active frontend.

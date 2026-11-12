@@ -113,3 +113,12 @@ The dependency set resolved, but a full clean Python virtualenv install was not 
 Authentication and origin rejection were tested locally; public TLS/proxy deployment
 and GPU operation were not performed. The deployment instructions describe those
 settings without claiming they have been deployed.
+
+
+## AiCS branding update
+
+Replaced the original sidebar wordmark with AiCS and a custom vector PPE helmet
+icon, also used as the SVG favicon. The new browser title includes AiCS.
+The production build passed and the actual port-8000 UI was visually checked in
+light and dark mode. See [AiCS helmet branding](screenshots/aics-brand.jpg).
+The earlier monitoring screenshots record the pre-branding polygon test.

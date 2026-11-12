@@ -1,4 +1,4 @@
-# Smart Safety & PPE Monitoring
+# AiCS · Smart Safety & PPE Monitoring
 
 FastAPI + Ultralytics YOLO backend และ React + Tailwind frontend สำหรับตรวจ PPE
 รายบุคคลและโซนห้ามเข้า ใช้โมเดลจริง `models/best.pt` จาก Kaggle และธีมของ
