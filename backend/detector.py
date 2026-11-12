@@ -5,8 +5,10 @@ from pathlib import Path
 import time
 
 import numpy as np
+import torch
 
 from .rules import Detection, classify_name
+from .devices import resolve_device
 
 
 class Detector:
@@ -31,6 +33,8 @@ class Detector:
         if not self.person_ids:
             raise ValueError("No person/human/worker class found in model.names")
         self.settings = settings
+        self.device = resolve_device(settings.device)
+        self.device_name = torch.cuda.get_device_name(self.device) if self.device.type == "cuda" else "CPU"
         self.sha256 = hashlib.sha256(settings.model_path.read_bytes()).hexdigest()
         self.training = None
         sidecar = settings.model_path.with_suffix(".metadata.json")
@@ -45,7 +49,7 @@ class Detector:
         palette = ["#3b82f6", "#8b5cf6", "#06b6d4", "#64748b", "#d946ef", "#14b8a6", "#22c55e", "#f97316", "#6366f1", "#eab308"]
         return {
             "model_name": self.settings.model_path.name, "sha256": self.sha256,
-            "device": self.settings.device, "class_count": len(self.names),
+            "device": str(self.device), "device_name": self.device_name, "class_count": len(self.names),
             "classes": [{"id": key, "name": name, "kind": classify_name(name), "color": palette[key % len(palette)]}
                         for key, name in self.names.items()],
             "person_class_ids": sorted(self.person_ids), "ppe_class_ids": sorted(self.ppe_ids),
@@ -56,7 +60,7 @@ class Detector:
         height, width = frame.shape[:2]
         start = time.perf_counter()
         result = self.model.predict(frame, conf=confidence, imgsz=self.settings.image_size,
-                                    device=self.settings.device, max_det=100, verbose=False)[0]
+                                    device=self.device, max_det=100, verbose=False)[0]
         detections = []
         if result.boxes is not None:
             for row in result.boxes.data.cpu().tolist():

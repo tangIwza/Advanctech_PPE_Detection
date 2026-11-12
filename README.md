@@ -23,7 +23,7 @@ repository เผยแพร่ซอร์ส เอกสาร และ tra
 
 ## เริ่มใช้บนเครื่องนี้
 
-โปรเจกต์มี frontend ที่ build แล้ว และได้ทดสอบด้วย Python 3.11 / CPU
+โปรเจกต์มี frontend ที่ build แล้ว และได้ทดสอบด้วย Python 3.11 / CPU และ NVIDIA CUDA GPU
 ดับเบิลคลิก **`run_backend.bat`** แล้วเปิด <http://127.0.0.1:8000>
 หยุดด้วย Ctrl+C ในหน้าต่างเซิร์ฟเวอร์
 
@@ -43,6 +43,20 @@ cd ..
 ใช้ npm 11 ตาม lockfile; npm 10 ที่มากับเครื่องนี้เคยเกิด Arborist error ระหว่าง
 resolve dependencies จึงระบุรุ่นในคำสั่งติดตั้งไว้โดยตรง
 ไม่ต้องโหลด weights เพิ่ม โมเดลที่ใช้งานอยู่คือ `models/best.pt`
+
+## เปิดใช้ NVIDIA GPU
+
+รันจาก project root:
+
+~~~powershell
+.\setup_gpu.bat
+.\run_backend.bat
+~~~
+
+ตัวติดตั้งสร้าง environment แยกที่ .venv และติดตั้ง PyTorch 2.2.2 + CUDA 12.1
+กับ torchvision รุ่นที่ตรงกันจากแหล่งทางการ ต้องมี NVIDIA driver และพื้นที่ว่าง
+สำหรับชุด CUDA จากนั้น run_backend.bat จะใช้ Python ใน .venv อัตโนมัติ
+รายละเอียดอยู่ใน [docs/GPU_SETUP.md](docs/GPU_SETUP.md)
 
 ## Backend และ Frontend แยกกันระหว่างพัฒนา
 
@@ -229,7 +243,7 @@ health check ใช้ `/health`; กล้องของ site ต้องเ�
 | `PPE_MODEL_PATH` | `models/best.pt` |
 | `PPE_DATA_DIR` | `backend/data` |
 | `PPE_FRONTEND_DIR` | `frontend/dist` |
-| `PPE_DEVICE` | `cpu` (ใช้ `0` สำหรับ CUDA ที่ติดตั้ง PyTorch/CUDA ตรงกัน) |
+| `PPE_DEVICE` | `auto` (เลือก CUDA GPU 0 หากพร้อม; บังคับได้ด้วย `0` หรือ `cpu`) |
 | `PPE_IMAGE_SIZE` | `640` (multiple of 32, 320–1536) |
 | `PPE_MAX_FPS` | `15` (1–30) |
 | `PPE_MAX_UPLOAD_MB` | `500` (1–4096) |
@@ -237,7 +251,9 @@ health check ใช้ `/health`; กล้องของ site ต้องเ�
 | `PPE_API_TOKEN` | ว่างสำหรับ local development |
 | `PPE_ALLOWED_ORIGINS` | localhost และ 127.0.0.1 พอร์ต 5173 / 8000 |
 
-paths แบบ relative อ้างจาก project root หาก GPU ไม่พร้อมให้คง `cpu`
+paths แบบ relative อ้างจาก project root ค่า auto เลือก CUDA เมื่อ PyTorch มองเห็น GPU
+และใช้ CPU บน environment ที่ไม่มี CUDA หากบังคับ GPU ด้วย PPE_DEVICE=0 แล้ว CUDA
+ไม่พร้อม ระบบจะแจ้งข้อผิดพลาดแทนการเปลี่ยนไป CPU โดยไม่แจ้ง
 startup warm-up จะตรวจ device ก่อนรายงานว่า backend พร้อม
 
 ## การทดสอบ

@@ -1,0 +1,115 @@
+{
+  "tested_at_utc": "2026-11-12T17:00:44.484988+00:00",
+  "live_device": "cuda:0",
+  "device_name": "NVIDIA GeForce RTX 3050 Laptop GPU",
+  "versions": {
+    "torch": "2.2.2+cu121",
+    "torchvision": "0.17.2+cu121",
+    "numpy": "1.26.4",
+    "opencv-python": "4.11.0.86",
+    "fastapi": "0.141.1",
+    "starlette": "1.3.1"
+  },
+  "same_environment_cpu": {
+    "device": "cpu",
+    "device_name": "CPU",
+    "frames": 12,
+    "image_size": 640,
+    "frame_size": [
+      1280,
+      720
+    ],
+    "median_inference_ms": 125.52,
+    "mean_inference_ms": 126.07,
+    "sample_detection_counts": [
+      9,
+      8,
+      10,
+      8,
+      11,
+      12,
+      10,
+      9,
+      10,
+      8,
+      9,
+      11
+    ],
+    "model_sha256": "b1a4c6457086c77f90c8dab5ebf65086f507b380357844bb72486e076f57c984"
+  },
+  "gpu": {
+    "device": "cuda:0",
+    "device_name": "NVIDIA GeForce RTX 3050 Laptop GPU",
+    "frames": 12,
+    "image_size": 640,
+    "frame_size": [
+      1280,
+      720
+    ],
+    "median_inference_ms": 24.78,
+    "mean_inference_ms": 29.25,
+    "sample_detection_counts": [
+      9,
+      8,
+      10,
+      8,
+      11,
+      12,
+      10,
+      9,
+      10,
+      8,
+      9,
+      11
+    ],
+    "model_sha256": "b1a4c6457086c77f90c8dab5ebf65086f507b380357844bb72486e076f57c984"
+  },
+  "median_speedup": 5.07,
+  "original_cpu_environment": {
+    "device": "cpu",
+    "device_name": "CPU",
+    "frames": 12,
+    "image_size": 640,
+    "frame_size": [
+      1280,
+      720
+    ],
+    "median_inference_ms": 179.79,
+    "mean_inference_ms": 184.2,
+    "sample_detection_counts": [
+      9,
+      8,
+      10,
+      8,
+      11,
+      12,
+      10,
+      9,
+      10,
+      8,
+      9,
+      11
+    ],
+    "model_sha256": "b1a4c6457086c77f90c8dab5ebf65086f507b380357844bb72486e076f57c984"
+  },
+  "integration": {
+    "device": "cuda:0",
+    "device_name": "NVIDIA GeForce RTX 3050 Laptop GPU",
+    "model_sha256": "b1a4c6457086c77f90c8dab5ebf65086f507b380357844bb72486e076f57c984",
+    "frames_processed": 5,
+    "inference_ms": 14.4,
+    "jpeg_bytes": 168925,
+    "websocket": "JSON and binary JPEG passed",
+    "rule_types": [
+      "missing_ppe",
+      "intrusion"
+    ],
+    "data_isolation": ".runtime/gpu-integration"
+  },
+  "backend_tests": 40,
+  "frontend_tests": 21,
+  "build": "passed",
+  "pip_check": "No broken requirements found",
+  "setup_gpu_bat": "passed",
+  "note": "Inference-only sample benchmark on 12 identical preloaded frames after warm-up; not an end-to-end FPS guarantee."
+}

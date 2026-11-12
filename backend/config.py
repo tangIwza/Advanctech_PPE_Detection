@@ -22,7 +22,7 @@ class Settings:
     retention_days: int = 30
     max_fps: float = 15.0
     image_size: int = 640
-    device: str = "cpu"
+    device: str = "auto"
     production: bool = False
 
     @classmethod
@@ -58,5 +58,5 @@ class Settings:
             api_token=token, allowed_origins=origins,
             max_upload_bytes=upload_mb * 1024 * 1024,
             max_fps=max_fps, image_size=image_size,
-            device=os.getenv("PPE_DEVICE", "cpu"), production=production,
+            device=os.getenv("PPE_DEVICE", "auto"), production=production,
         )

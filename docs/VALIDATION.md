@@ -5,7 +5,7 @@ The reference UI was inspected before frontend implementation; see [UI_THEME.md]
 
 | Check | Result |
 | --- | --- |
-| `python -X utf8 -B -m pytest backend/tests -q` | **34 passed** |
+| `python -X utf8 -B -m pytest backend/tests -q` | **40 passed** |
 | `npm test` | **21 passed**, 4 test files |
 | `npm run build` | TypeScript check and Vite production build passed |
 | `npx --yes npm@11.6.2 ci --no-fund` | Clean lockfile install passed |
@@ -122,3 +122,23 @@ icon, also used as the SVG favicon. The new browser title includes AiCS.
 The production build passed and the actual port-8000 UI was visually checked in
 light and dark mode. See [AiCS helmet branding](screenshots/aics-brand.jpg).
 The earlier monitoring screenshots record the pre-branding polygon test.
+
+
+## NVIDIA GPU validation
+
+Installed a complete project-local CUDA environment and changed the default device
+selection to auto. The active port-8000 backend now runs the real model on cuda:0
+(NVIDIA GeForce RTX 3050 Laptop GPU). CPU can still be selected explicitly.
+
+The complete CUDA environment passed 40 backend tests and pip check. Frontend tests
+(21), TypeScript and the production build passed. The GPU setup batch script completed
+successfully. A real-model integration test used an isolated data directory and
+verified video inference, both PPE and polygon intrusion events, and paired
+WebSocket JSON/JPEG delivery. The browser showed CUDA:0 and the actual hardware name.
+
+Matched-environment median inference time over 12 identical preloaded sample frames
+was 125.52 ms for CPU and 24.78 ms for GPU (5.07x). This benchmark excludes capture,
+JPEG delivery and the configured stream FPS cap. Full results and software versions:
+[validation-gpu.json](validation-gpu.json). Instructions: [GPU_SETUP.md](GPU_SETUP.md).
+The earlier CPU-only limitations describe the original validation stage; the CUDA
+environment and GPU operation were subsequently verified as recorded here.
