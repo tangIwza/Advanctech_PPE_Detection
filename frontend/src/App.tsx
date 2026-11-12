@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Activity, AlertTriangle, Bell, Check, Cpu, Edit3, Info, KeyRound, Layers, Loader2, Plus, RefreshCw, ShieldCheck, Square, Trash2, Volume2, VolumeX, Wifi, WifiOff, X } from 'lucide-react';
+import { Activity, AlertTriangle, Bell, Check, Cpu, Edit3, Info, KeyRound, Layers, Loader2, Plus, RefreshCw, Square, Trash2, Volume2, VolumeX, X } from 'lucide-react';
 import { api, ApiError, readToken, setToken } from './api';
 import { useStream } from './useStream';
 import type { Alert, ModelInfo, MonitorSettings, Page, Toast, VideoSource, Zone, ZoneGeometry, ZoneInput, ZoneShape } from './types';
@@ -159,7 +159,6 @@ export default function App() {
   ];
 
   return <Layout page={page} onNavigate={navigate} dark={dark} onTheme={() => { localStorage.setItem('ppe-theme', dark ? 'light' : 'dark'); setDark(!dark); }} connected={connected && !!model} model={model} unacknowledged={alerts.filter(item => !item.acknowledged_at).length}>
-    <div className="flex items-center justify-between gap-3"><div><p className="text-xs text-gray-500">Smart Safety & PPE Monitoring</p><div className="flex items-center gap-2 mt-1"><ShieldCheck size={16} className="text-blue-900" /><p className="text-sm font-semibold text-gray-700">{packet?.source?.name || 'Safety control workspace'}</p></div></div><div className="flex items-center gap-2"><Badge tone={connected ? 'green' : 'amber'}>{connected ? <Wifi size={11} /> : <WifiOff size={11} />}{connection === 'connected' ? 'Live connection' : connection === 'unauthorized' ? 'Authentication required' : connection === 'connecting' ? 'Connecting' : 'Reconnecting'}</Badge><button className="icon-button border border-gray-200 bg-white" aria-label="Connection settings" onClick={() => { setTokenDraft(token); setConnectionOpen(true); }}><KeyRound size={14} /></button></div></div>
     {(bootError || packet?.error) && <div role="alert" className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3"><AlertTriangle size={17} className="text-red-600 mt-0.5 shrink-0" /><div className="flex-1 text-xs text-red-700 leading-relaxed">{bootError || packet?.error}</div><button className="text-xs font-semibold text-red-700 flex items-center gap-1" onClick={() => setReload(reload + 1)}><RefreshCw size={12} />Retry</button></div>}
 
     {page === 'monitor' && <>
